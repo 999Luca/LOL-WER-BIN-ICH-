@@ -33,7 +33,24 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
   del(k) { try { localStorage.removeItem(k); } catch {} },
 };
-const splashUrl = id => `${DD}/cdn/img/champion/splash/${id}_0.jpg`;
+const splashUrl = (id, num = 0) => `${DD}/cdn/img/champion/splash/${id}_${num}.jpg`;
+// Bild + Fallbacks (Skin → Standard-Splash → Icon)
+const artSrc = (c, v) => ({
+  src: splashUrl(c.id, c.skin ? c.skin.num : 0),
+  fb: [c.skin ? splashUrl(c.id) : null, iconUrl(v, c.id)].filter(Boolean).join('|'),
+});
+function bindFallbacks(root) {
+  root.querySelectorAll('img[data-fb]').forEach(im => {
+    im.addEventListener('error', function onErr() {
+      const list = im.dataset.fb.split('|').filter(Boolean);
+      const next = list.shift();
+      if (!next) { im.removeEventListener('error', onErr); return; }
+      im.dataset.fb = list.join('|');
+      if (!list.length) im.classList.add('icon');
+      im.src = next;
+    });
+  });
+}
 const iconUrl = (v, id) => `${DD}/cdn/${v}/img/champion/${id}.png`;
 const qWord = n => (n === 1 ? 'Frage' : 'Fragen');
 const poolLabel = tags => (tags.length ? tags.map(t => TAG_DE[t] || t).join(' / ') : 'Alle Champions');
@@ -137,6 +154,8 @@ async function copy(text) {
 function show(id) {
   ['home', 'lobby', 'game'].forEach(v => $('#' + v).classList.toggle('hidden', v !== id));
   $('#logo').classList.toggle('compact', id === 'game');
+  $('#reactBar').classList.toggle('hidden', id !== 'game');
+  if (id !== 'game') { $('#notes').classList.add('hidden'); $('#reveal').classList.add('hidden'); }
 }
 
 function goHome(prefillCode) {
@@ -215,9 +234,9 @@ function handleEvents(prev, cur) {
   }
   for (const p of cur.players) {
     const before = prev.players.find(x => x.pid === p.pid);
-    if (before && !before.done && p.done && !p.gaveUp) {
-      confetti(p.pid === me);
-      SFX.win();
+    if (before && !before.done && p.done) {
+      if (!p.gaveUp) { confetti(p.pid === me); SFX.win(); }
+      showReveal(p, p.pid === me, cur.version);
     }
     if (before && p.penalties > before.penalties && p.pid !== me) SFX.wrong();
   }
@@ -298,7 +317,8 @@ function renderLobby() {
 
   $('#lRules').innerHTML = `
     <button type="button" class="chip ${view.yesContinues ? 'on' : ''}" data-rule="yes" ${dis}>Bei „Ja“ weiterfragen</button>
-    <button type="button" class="chip ${view.yesContinues ? '' : 'on'}" data-rule="one" ${dis}>Immer nur 1 Frage pro Zug</button>`;
+    <button type="button" class="chip ${view.yesContinues ? '' : 'on'}" data-rule="one" ${dis}>Immer nur 1 Frage pro Zug</button>
+    <button type="button" class="chip ${view.skins ? 'on' : ''}" data-rule="skins" ${dis}>✨ Zufällige Skins ${view.skins ? 'an' : 'aus'}</button>`;
 
   $('#startBtn').classList.toggle('hidden', !host);
   $('#lWait').classList.toggle('hidden', host);
@@ -319,7 +339,8 @@ $('#lChips').addEventListener('click', e => {
 });
 $('#lRules').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b || b.disabled || !isHost()) return;
-  socket.emit('settings', { yesContinues: b.dataset.rule === 'yes' });
+  if (b.dataset.rule === 'skins') socket.emit('settings', { skins: !view.skins });
+  else socket.emit('settings', { yesContinues: b.dataset.rule === 'yes' });
 });
 $('#lPlayers').addEventListener('click', e => {
   const b = e.target.closest('[data-kick]'); if (!b) return;
@@ -454,8 +475,9 @@ function renderGame() {
     const isMe = p.pid === view.youPid;
     const isTurn = playing && p.pid === view.turnPid;
     const c = p.champ;
+    const img = c && artSrc(c, v);
     const front = c
-      ? `<img src="${splashUrl(c.id)}" alt="${esc(c.name)}" data-fb="${iconUrl(v, c.id)}"><div class="cname">${esc(c.name)}<small>${esc(c.title)}</small></div>`
+      ? `<img src="${img.src}" alt="${esc(c.name)}" data-fb="${img.fb}"><div class="cname">${esc(c.name)}<small>${esc(c.skin ? '✨ ' + c.skin.name : c.title)}</small></div>`
       : '';
     let art;
     if (isMe) {
@@ -475,6 +497,7 @@ function renderGame() {
     let action = '';
     if (isMe && playing && !p.done) {
       action = `<button class="btn primary" type="button" data-act="guess">Ich hab's erraten!</button>
+        <button class="btn small" type="button" data-act="notes">📋 Notizblock</button>
         <button class="btn small ghost" type="button" data-act="giveup">🏳 Aufgeben</button>`;
     } else if (p.gaveUp) action = `<div class="fin-note gave">Aufgegeben nach ${p.q} ${qWord(p.q)}</div>`;
     else if (p.done) action = `<div class="fin-note">✓ Erraten mit ${p.q} ${qWord(p.q)}</div>`;
@@ -506,12 +529,7 @@ function renderGame() {
       </article>`;
   }).join('');
 
-  grid.querySelectorAll('img[data-fb]').forEach(im => {
-    im.addEventListener('error', function onErr() {
-      im.removeEventListener('error', onErr);
-      im.src = im.dataset.fb; im.classList.add('icon');
-    });
-  });
+  bindFallbacks(grid);
   const anim = grid.querySelector('.flip[data-anim]');
   if (anim) requestAnimationFrame(() => requestAnimationFrame(() => anim.classList.add('revealed')));
 
@@ -565,7 +583,7 @@ function renderRanking(host) {
         : '<p class="help">Warte, bis der Host eine neue Runde startet …</p>')
     : '';
   el.innerHTML = `<h2><span>🏆 ${finished ? 'Rangliste' : 'Zwischenstand'} · Runde ${view.round}</span>${finished ? '<span class="done-l">Runde beendet</span>' : ''}</h2>
-    <ol>${rows.join('')}</ol>${total}${actions}`;
+    <ol>${rows.join('')}</ol>${finished ? awardsHtml() : ''}${total}${actions}`;
 }
 
 $('#game').addEventListener('click', e => {
@@ -575,6 +593,7 @@ $('#game').addEventListener('click', e => {
     case 'q': socket.emit('question', { pid: b.dataset.pid, delta: +b.dataset.d }, fail); break;
     case 'next': socket.emit('nextTurn', null, fail); break;
     case 'guess': openGuess(); break;
+    case 'notes': openNotes(); break;
     case 'giveup':
       if (confirm('Wirklich aufgeben? Dein Champion wird aufgedeckt und du landest am Ende der Rangliste.')) {
         socket.emit('giveUp', null, res => { if (res && res.ok) toast(`Du warst ${res.champ.name}.`); });
@@ -598,6 +617,137 @@ $('#toLobbyBtn').onclick = () => {
   if (view.state === 'playing' && !confirm('Laufende Runde abbrechen und zurück in die Lobby?')) return;
   socket.emit('toLobby', null, () => {});
 };
+
+/* ---------- Auszeichnungen am Rundenende ---------- */
+function awardsHtml() {
+  const names = pids => pids.map(pid => byPid(pid)).filter(Boolean).map(p => esc(p.name)).join(' & ');
+  const top = (scoreMap, min) => {
+    const max = Math.max(0, ...Object.values(scoreMap));
+    if (max < min) return null;
+    return { pids: Object.keys(scoreMap).filter(k => scoreMap[k] === max), max };
+  };
+  const per = fn => Object.fromEntries(view.players.map(p => [p.pid, fn(p)]));
+  const asked = per(p => view.history.filter(h => h.askerPid === p.pid).length);
+  const yeses = per(p => view.history.filter(h => h.askerPid === p.pid && h.result === 'yes').length);
+  const noStreak = per(p => {
+    let best = 0, cur = 0;
+    for (const h of view.history.filter(x => x.askerPid === p.pid)) { cur = h.result === 'no' ? cur + 1 : 0; best = Math.max(best, cur); }
+    return best;
+  });
+  const shrugs = per(p => view.history.filter(h => h.votes && h.votes[p.pid] === 'maybe').length);
+  const kamikaze = per(p => p.penalties);
+  const solved = view.players.filter(p => p.done && !p.gaveUp).sort((a, b) => a.doneOrder - b.doneOrder);
+
+  const list = [];
+  if (solved.length) list.push({ i: '⚡', t: 'Blitzmerker', who: esc(solved[0].name), d: 'hat als Erstes richtig geraten' });
+  let a;
+  if ((a = top(asked, 1))) list.push({ i: '❓', t: 'Neugierigste Person', who: names(a.pids), d: `${a.max} ${qWord(a.max)} gestellt` });
+  if ((a = top(yeses, 2))) list.push({ i: '🍀', t: 'Glückspilz', who: names(a.pids), d: `${a.max}× „Ja“ bekommen` });
+  if ((a = top(noStreak, 3))) list.push({ i: '🧱', t: 'Nein-Mauer', who: names(a.pids), d: `${a.max}× „Nein“ am Stück` });
+  if ((a = top(kamikaze, 1))) list.push({ i: '💥', t: 'Kamikaze', who: names(a.pids), d: `${a.max}× falsch getippt` });
+  if ((a = top(shrugs, 2))) list.push({ i: '🤷', t: 'Ahnungslos', who: names(a.pids), d: `${a.max}× „Weiß nicht“ gestimmt` });
+  if (!list.length) return '';
+  return `<h3 class="sub-h">Auszeichnungen</h3><div class="awards">${list.map(x =>
+    `<div class="award"><span class="ai">${x.i}</span><div><b>${x.t}</b><span>${x.who}</span><small>${x.d}</small></div></div>`).join('')}</div>`;
+}
+
+/* ---------- Aufdecken-Overlay ---------- */
+let revealT;
+function showReveal(p, isMe, v) {
+  const c = p.champ; if (!c) return;
+  const img = artSrc(c, v || ddVersion);
+  const head = p.gaveUp
+    ? `🏳 ${isMe ? 'Du gibst auf' : esc(p.name) + ' gibt auf'} – es war …`
+    : `🎉 ${isMe ? 'Richtig! Du bist …' : esc(p.name) + ' hat es erraten!'}`;
+  const blurb = c.blurb ? esc(c.blurb.length > 260 ? c.blurb.slice(0, 257).replace(/\s\S*$/, '') + ' …' : c.blurb) : '';
+  const el = $('#reveal');
+  el.innerHTML = `
+    <div class="rv-bg"><img src="${img.src}" alt="" data-fb="${img.fb}"></div>
+    <div class="rv-box">
+      <div class="rv-head">${head}</div>
+      <div class="rv-name">${esc(c.name)}</div>
+      <div class="rv-title">${esc(c.title)}${c.skin ? ` · ✨ ${esc(c.skin.name)}` : ''}</div>
+      ${blurb ? `<p class="rv-blurb">${blurb}</p>` : ''}
+      <div class="rv-q">${p.q} ${qWord(p.q)}${p.penalties ? ` · ${p.penalties}× falsch getippt` : ''}</div>
+      <div class="rv-hint">Tippen zum Schließen</div>
+    </div>`;
+  bindFallbacks(el);
+  el.classList.remove('hidden');
+  clearTimeout(revealT);
+  revealT = setTimeout(hideReveal, 6500);
+}
+function hideReveal() { $('#reveal').classList.add('hidden'); }
+$('#reveal').addEventListener('click', hideReveal);
+
+/* ---------- Emoji-Reaktionen ---------- */
+$('#reactToggle').onclick = () => $('#reactBar').classList.toggle('open');
+$('#reactBar').addEventListener('click', e => {
+  const b = e.target.closest('[data-emoji]'); if (!b) return;
+  socket.emit('react', { emoji: b.dataset.emoji });
+});
+socket.on('reaction', ({ name, emoji }) => {
+  const d = document.createElement('div');
+  d.className = 'float-emoji';
+  d.innerHTML = `<span>${esc(emoji)}</span><small>${esc(name)}</small>`;
+  d.style.left = 8 + Math.random() * 78 + 'vw';
+  document.body.appendChild(d);
+  if (reduceMotion) { setTimeout(() => d.remove(), 1500); return; }
+  d.animate([
+    { transform: 'translateY(0) scale(.6)', opacity: 0 },
+    { transform: 'translateY(-8vh) scale(1.1)', opacity: 1, offset: 0.15 },
+    { transform: `translate(${(Math.random() - 0.5) * 80}px,-55vh) scale(1)`, opacity: 0 },
+  ], { duration: 2600, easing: 'ease-out' }).onfinish = () => d.remove();
+});
+
+/* ---------- Notizblock (privat) ---------- */
+let excluded = new Set();
+const notesKey = () => `wbi.notes.${view.code}.${view.round}`;
+function loadNotes() {
+  try { excluded = new Set(JSON.parse(store.get(notesKey()) || '[]')); } catch { excluded = new Set(); }
+}
+function saveNotes() { store.set(notesKey(), JSON.stringify([...excluded])); }
+function notesPool() {
+  return view.tags.length ? champList.filter(c => (c.tags || []).some(t => view.tags.includes(t))) : champList;
+}
+function openNotes() {
+  loadNotes();
+  $('#nSearch').value = '';
+  $('#nTags').innerHTML = TAGS.map(([k, de]) => `<button type="button" class="chip" data-xtag="${k}">✕ ${de}</button>`).join('');
+  renderNotes();
+  $('#notes').classList.remove('hidden');
+}
+function renderNotes() {
+  const v = view.version || ddVersion;
+  const q = norm($('#nSearch').value);
+  const onlyLeft = $('#nOnlyLeft').checked;
+  const list = notesPool();
+  const left = list.filter(c => !excluded.has(c.id)).length;
+  $('#nCount').textContent = `${left} von ${list.length} übrig`;
+  $('#nGrid').innerHTML = list
+    .filter(c => (!q || norm(c.name).includes(q)) && (!onlyLeft || !excluded.has(c.id)))
+    .map(c => `<button type="button" class="nchamp ${excluded.has(c.id) ? 'x' : ''}" data-id="${c.id}" title="${esc(c.name)}">
+      <img src="${iconUrl(v, c.id)}" alt="" loading="lazy"><span>${esc(c.name)}</span></button>`).join('');
+}
+$('#nGrid').addEventListener('click', e => {
+  const b = e.target.closest('.nchamp'); if (!b) return;
+  const id = b.dataset.id;
+  if (excluded.has(id)) excluded.delete(id); else excluded.add(id);
+  saveNotes();
+  if ($('#nOnlyLeft').checked) renderNotes();
+  else { b.classList.toggle('x'); const list = notesPool(); $('#nCount').textContent = `${list.filter(c => !excluded.has(c.id)).length} von ${list.length} übrig`; }
+});
+$('#nTags').addEventListener('click', e => {
+  const b = e.target.closest('[data-xtag]'); if (!b) return;
+  const t = b.dataset.xtag;
+  notesPool().forEach(c => { if ((c.tags || []).includes(t)) excluded.add(c.id); });
+  saveNotes(); renderNotes();
+  toast(`Alle ${TAG_DE[t]} ausgeschlossen.`);
+});
+$('#nSearch').addEventListener('input', renderNotes);
+$('#nOnlyLeft').addEventListener('change', renderNotes);
+$('#nReset').onclick = () => { if (confirm('Alle Markierungen zurücksetzen?')) { excluded.clear(); saveNotes(); renderNotes(); } };
+$('#nClose').onclick = () => $('#notes').classList.add('hidden');
+$('#notes').addEventListener('click', e => { if (e.target.id === 'notes') $('#notes').classList.add('hidden'); });
 
 /* ---------- Guess-Modal mit Autocomplete ---------- */
 let suggIdx = -1;

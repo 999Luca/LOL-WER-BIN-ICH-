@@ -45,7 +45,14 @@ Node.js ab Version 18 ist nötig, weil der Server das eingebaute `fetch` benutzt
 6. **Ich hab's erraten!** öffnet ein Eingabefeld mit Autovervollständigung. Ein richtiger Tipp deckt deine Karte auf, ein falscher kostet +1 Frage und beendet deinen Zug. Mit **Aufgeben** deckst du deinen Champion auf und landest am Ende der Rangliste.
 7. Wenn alle fertig sind, erscheint die Rangliste (wenigste Fragen gewinnt) und dazu die **Gesamtwertung** über alle Runden mit Siegen und Ø Fragen. Danach startet der Host eine **neue Runde** oder geht zurück in die **Lobby**.
 
-Extras: Sounds (Ton aus mit 🔊), Vibration auf dem Handy, Konfetti bei richtigen Tipps und „🎯 Du bist dran!“ im Tab-Titel.
+Extras:
+- 📋 **Notizblock**: ein privates Raster mit allen Champions zum Ausschließen, auch eine ganze Klasse auf einmal
+- 😀 **Emoji-Reaktionen**, die bei allen über den Bildschirm fliegen
+- 🎉 **Aufdecken in groß** mit Splash-Art, Titel und Kurzgeschichte des Champions
+- 🏅 **Auszeichnungen** am Rundenende: Blitzmerker, Neugierigste Person, Glückspilz, Nein-Mauer, Kamikaze, Ahnungslos
+- ✨ **Skin-Modus** (in der Lobby, standardmäßig aus): zufällige Skins statt Standard-Splash
+- 🔊 Sounds (Stummschalter oben), Vibration auf dem Handy, Konfetti, „🎯 Du bist dran!“ im Tab-Titel
+- Auf Render ruft der Server sich während eines laufenden Spiels alle 10 Minuten selbst auf, damit er nicht einschläft
 
 Lädt jemand die Seite neu, landet er wieder in seinem Raum. Die Sitzungs-ID liegt im `localStorage`. Wer länger offline ist, kann vom Host entfernt werden. Ist der Host länger als 45 Sekunden offline, übernimmt ein anderer Spieler.
 

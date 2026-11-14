@@ -247,6 +247,62 @@ table.score tr.you td{color:var(--hex-l)}
 table.score td:not(:first-child),table.score th:not(:first-child){text-align:center}
 .confetti{position:fixed; top:0; z-index:80; pointer-events:none; border-radius:1px}
 
+/* ---------- Auszeichnungen ---------- */
+.awards{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px}
+.award{display:flex; gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--gold-dd); background:linear-gradient(135deg,#c8aa6e14,#010a13 60%)}
+.award .ai{font-size:1.8rem; line-height:1}
+.award b{display:block; font-family:'Cinzel',serif; color:var(--gold); font-size:.9rem}
+.award span{display:block; color:var(--gold-l); font-weight:600}
+.award small{color:var(--muted); font-size:.8rem}
+
+/* ---------- Aufdecken-Overlay ---------- */
+.reveal{position:fixed; inset:0; z-index:75; display:grid; place-items:center; padding:16px; cursor:pointer; background:#010a13; animation:rvIn .35s ease-out}
+.rv-bg{position:absolute; inset:0; overflow:hidden; pointer-events:none}
+.rv-bg img{width:100%; height:100%; object-fit:cover; object-position:50% 25%; opacity:.55; filter:saturate(1.1); animation:rvZoom 7s ease-out forwards}
+.rv-bg img.icon{object-fit:contain; opacity:.25}
+.rv-bg::after{content:""; position:absolute; inset:0; background:radial-gradient(ellipse at center,transparent 20%,#010a13 85%)}
+.rv-box{position:relative; text-align:center; max-width:620px; display:grid; gap:8px; animation:rvPop .5s cubic-bezier(.2,1.3,.4,1)}
+.rv-head{color:var(--hex-l); text-transform:uppercase; letter-spacing:.15em; font-weight:700; font-size:.95rem; text-shadow:0 0 12px #0ac8b9}
+.rv-name{font-family:'Cinzel',serif; font-weight:800; font-size:clamp(2.6rem,11vw,5rem); line-height:1;
+  background:linear-gradient(180deg,#fff 0%,#f0e6d2 40%,#c8aa6e 100%); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 4px 20px #000)}
+.rv-title{color:var(--gold); font-family:'Cinzel',serif; font-size:1.05rem}
+.rv-blurb{color:var(--gold-l); opacity:.9; font-size:.95rem; margin:6px 0 0; text-shadow:0 2px 6px #000}
+.rv-q{font-family:'Cinzel',serif; font-weight:800; color:var(--hex); font-size:1.2rem}
+.rv-hint{color:var(--muted); font-size:.75rem; margin-top:6px}
+@keyframes rvIn{from{opacity:0}}
+@keyframes rvPop{from{transform:scale(.7); opacity:0}}
+@keyframes rvZoom{from{transform:scale(1.15)}}
+
+/* ---------- Reaktionen ---------- */
+.react{position:fixed; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:30; display:flex; align-items:center; gap:8px}
+.react-toggle{width:52px; height:52px; border-radius:50%; font-size:1.6rem; cursor:pointer; border:2px solid var(--gold); background:radial-gradient(circle,#0f3a4a,#010a13); box-shadow:0 0 16px #0ac8b955, 0 6px 20px #000a}
+.react-list{display:none; gap:4px; padding:6px; border:1px solid var(--gold-d); background:#0a1428f2; box-shadow:0 6px 20px #000a; flex-wrap:wrap; max-width:calc(100vw - 100px)}
+.react.open .react-list{display:flex}
+.react-list button{font-size:1.5rem; width:44px; height:44px; border:none; background:transparent; cursor:pointer; border-radius:6px; touch-action:manipulation}
+.react-list button:hover{background:#c8aa6e22}
+.float-emoji{position:fixed; bottom:90px; z-index:70; pointer-events:none; text-align:center}
+.float-emoji span{display:block; font-size:2.6rem; filter:drop-shadow(0 4px 8px #000)}
+.float-emoji small{display:block; color:var(--gold-l); font-weight:700; font-size:.75rem; text-shadow:0 1px 4px #000}
+#game{padding-bottom:70px}
+
+/* ---------- Notizblock ---------- */
+.notes-box{max-width:760px; max-height:calc(100vh - 32px); display:flex; flex-direction:column; gap:10px}
+#notes{padding-top:16px; align-items:center}
+.notes-head{display:flex; justify-content:space-between; align-items:center}
+.notes-head h2{margin:0}
+.notes-tags .chip{min-height:36px; padding:6px 10px; font-size:.82rem}
+.notes-bar{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+.chk{display:flex; gap:6px; align-items:center; color:var(--gold-l); font-size:.9rem; cursor:pointer}
+.chk input{width:18px; height:18px; accent-color:var(--hex)}
+.ncount{color:var(--hex); font-weight:700; margin-left:auto}
+.ngrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:6px; overflow:auto; min-height:120px; padding:2px}
+.nchamp{display:grid; justify-items:center; gap:3px; padding:4px 2px; border:1px solid var(--gold-dd); background:#010a13; color:var(--gold-l); cursor:pointer; font:500 .68rem 'Barlow',sans-serif; position:relative; touch-action:manipulation}
+.nchamp img{width:48px; height:48px; display:block}
+.nchamp span{max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 2px}
+.nchamp:hover{border-color:var(--gold)}
+.nchamp.x{opacity:.3; filter:grayscale(1)}
+.nchamp.x::after{content:"✕"; position:absolute; top:2px; left:0; right:0; text-align:center; font-size:2.2rem; line-height:48px; color:var(--bad); font-weight:700}
+
 /* ---------- Ranking & Log ---------- */
 .rank h2{justify-content:space-between; flex-wrap:wrap}
 .rank .done-l{color:var(--ok); font-family:'Barlow',sans-serif; font-size:.82rem; text-transform:uppercase; letter-spacing:.1em}
@@ -295,6 +351,6 @@ table.score td:not(:first-child),table.score th:not(:first-child){text-align:cen
   .counter{grid-template-columns:34px 1fr 46px}
 }
 @media (prefers-reduced-motion:reduce){
-  .mystery .ring,.counter.bump .val b,.modal-box.shake,.qpanel.need-vote,.result{animation:none}
+  .mystery .ring,.counter.bump .val b,.modal-box.shake,.qpanel.need-vote,.result,.reveal,.rv-box,.rv-bg img{animation:none}
   .flip{transition:none}
 }

@@ -28,7 +28,10 @@ async function loadChampions() {
   const v = vs.find(x => /^\d+\.\d+\.\d+$/.test(x));
   const cj = await (await fetch(`${DD}/cdn/${v}/data/de_DE/champion.json`)).json();
   const list = Object.values(cj.data)
-    .map(c => ({ id: c.id, name: c.name, title: c.title || '', tags: c.tags || [] }))
+    .map(c => ({
+      id: c.id, name: c.name, title: c.title || '', tags: c.tags || [],
+      blurb: String(c.blurb || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   if (!list.length) throw new Error('Leere Championliste');
   champions = list;
@@ -46,6 +49,28 @@ async function loadWithRetry() {
 }
 loadWithRetry();
 setInterval(() => loadChampions().catch(e => console.error('[ddragon] Refresh:', e.message)), 6 * 3600 * 1000);
+
+/* ---------- Skins (optional) ---------- */
+const skinCache = new Map(); // `${version}:${id}` -> [{num, name}]
+async function skinsFor(v, id) {
+  const key = `${v}:${id}`;
+  if (skinCache.has(key)) return skinCache.get(key);
+  const j = await (await fetch(`${DD}/cdn/${v}/data/de_DE/champion/${id}.json`)).json();
+  // keine Chromas (haben meist kein eigenes Splash-Bild)
+  const skins = (j.data[id].skins || []).filter(s => s.num > 0 && s.parentSkin === undefined).map(s => ({ num: s.num, name: s.name }));
+  skinCache.set(key, skins);
+  return skins;
+}
+async function assignSkins(room) {
+  const tasks = room.players.map(async p => {
+    try {
+      const skins = await skinsFor(room.version, p.champ.id);
+      p.skin = skins.length ? skins[crypto.randomInt(skins.length)] : null;
+    } catch { p.skin = null; }
+  });
+  // nicht länger als 3 s warten
+  await Promise.race([Promise.all(tasks), new Promise(r => setTimeout(r, 3000))]);
+}
 
 const poolFor = tags => (tags.length ? champions.filter(c => c.tags.some(t => tags.includes(t))) : champions);
 const normalize = s => String(s || '').toLowerCase().normalize('NFD')
@@ -70,6 +95,7 @@ function createRoom() {
     state: 'lobby', // lobby | playing | finished
     tags: [],
     yesContinues: true, // bei „Ja“ darf man weiterfragen
+    skins: false,       // zufällige Skins statt Standard-Splash
     round: 0,
     turnPid: null,
     doneCounter: 0,
@@ -119,6 +145,7 @@ function viewFor(room, sid) {
     round: room.round,
     tags: room.tags,
     yesContinues: room.yesContinues,
+    skins: room.skins,
     poolSize: poolFor(room.tags).length,
     version: room.version || version,
     youPid: me ? me.pid : null,
@@ -135,7 +162,7 @@ function viewFor(room, sid) {
       myVote: me ? q.votes[me.pid] || null : null,
     },
     lastResult: room.lastResult,
-    history: room.history.map(h => ({ id: h.id, askerPid: h.askerPid, text: h.text, result: h.result, counts: h.counts })),
+    history: room.history.map(h => ({ id: h.id, askerPid: h.askerPid, text: h.text, result: h.result, counts: h.counts, votes: h.votes })),
     players: room.players.map(p => ({
       pid: p.pid,
       name: p.name,
@@ -149,7 +176,7 @@ function viewFor(room, sid) {
       rounds: p.rounds,
       totalQ: p.totalQ,
       // Den eigenen Champion bekommt man erst, wenn man fertig ist.
-      champ: p.champ && (p.sid !== sid || p.done || reveal) ? p.champ : null,
+      champ: p.champ && (p.sid !== sid || p.done || reveal) ? { ...p.champ, skin: p.skin || null } : null,
     })),
     log: room.log.slice(-15),
   };
@@ -247,7 +274,7 @@ function startRound(room) {
   room.state = 'playing';
   resetRoundState(room);
   room.players.forEach((p, i) => {
-    Object.assign(p, { champ: pool[i], q: 0, penalties: 0, done: false, gaveUp: false, doneOrder: 0 });
+    Object.assign(p, { champ: pool[i], skin: null, q: 0, penalties: 0, done: false, gaveUp: false, doneOrder: 0 });
   });
   room.turnPid = nextUndone(room, (room.round - 1) % room.players.length);
   addLog(room, `🎲 Runde ${room.round} gestartet – ${byPid(room, room.turnPid).name} beginnt.`);
@@ -339,7 +366,7 @@ io.on('connection', socket => {
     player.sockets.add(socket.id);
   }
 
-  const meta = () => ({ version, champList: champions.map(c => ({ id: c.id, name: c.name })) });
+  const meta = () => ({ version, champList: champions.map(c => ({ id: c.id, name: c.name, tags: c.tags })) });
 
   socket.on('create', (data, ack) => {
     ack = safeAck(ack);
@@ -411,19 +438,37 @@ io.on('connection', socket => {
     if (!room || !me || !isHost(room, me) || room.state !== 'lobby') return ack({ ok: false });
     if (data && Array.isArray(data.tags)) room.tags = TAGS.filter(t => data.tags.includes(t));
     if (data && typeof data.yesContinues === 'boolean') room.yesContinues = data.yesContinues;
+    if (data && typeof data.skins === 'boolean') room.skins = data.skins;
     broadcast(room);
     ack({ ok: true });
   });
 
-  socket.on('start', (_, ack) => {
+  socket.on('start', async (_, ack) => {
     ack = safeAck(ack);
     const { room, me } = ctx();
     if (!room || !me || !isHost(room, me)) return ack({ ok: false, error: 'Nur der Host kann starten.' });
-    if (room.state === 'playing') return ack({ ok: false, error: 'Die Runde läuft bereits.' });
+    if (room.state === 'playing' || room.starting) return ack({ ok: false, error: 'Die Runde läuft bereits.' });
     const err = startRound(room);
     if (err) return ack({ ok: false, error: err });
+    if (room.skins) {
+      room.starting = true;
+      try { await assignSkins(room); } finally { room.starting = false; }
+    }
     broadcast(room);
     ack({ ok: true });
+  });
+
+  // Emoji-Reaktionen (nicht gespeichert, nur weitergereicht)
+  const REACTIONS = ['😂', '🔥', '💀', '🤔', '👀', '🧠', '😱', '👏'];
+  let lastReact = 0;
+  socket.on('react', data => {
+    const { room, me } = ctx();
+    const emoji = data && data.emoji;
+    if (!room || !me || !REACTIONS.includes(emoji)) return;
+    const now = Date.now();
+    if (now - lastReact < 600) return;
+    lastReact = now;
+    for (const p of room.players) for (const sockId of p.sockets) io.to(sockId).emit('reaction', { name: me.name, emoji });
   });
 
   socket.on('toLobby', (_, ack) => {
@@ -569,3 +614,13 @@ app.get('/room/:code', (req, res) => res.sendFile(path.join(PUBLIC, 'index.html'
 app.get('/healthz', (req, res) => res.json({ ok: true, version, champions: champions.length, rooms: rooms.size }));
 
 server.listen(PORT, () => console.log(`Wer bin ich? läuft auf http://localhost:${PORT}`));
+
+// Render (Free) schläft nach 15 min ohne HTTP-Anfragen ein. Solange jemand in einem
+// Raum verbunden ist, ruft der Server sich deshalb alle 10 min selbst auf.
+const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+if (SELF_URL) {
+  setInterval(() => {
+    const active = [...rooms.values()].some(r => r.players.some(isConnected));
+    if (active) fetch(`${SELF_URL}/healthz`).catch(() => {});
+  }, 10 * 60 * 1000);
+}
