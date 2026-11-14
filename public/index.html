@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#010a13">
+<title>Wer bin ich? – LoL</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='15' y='15' width='70' height='70' transform='rotate(45 50 50)' fill='%23010a13' stroke='%23c8aa6e' stroke-width='6'/><text x='50' y='67' font-size='50' text-anchor='middle' fill='%230ac8b9' font-family='serif' font-weight='bold'>?</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="offline" class="offline hidden">Verbindung verloren – verbinde neu …</div>
+
+<div class="wrap">
+  <header class="logo" id="logo">
+    <h1>Wer bin ich?</h1>
+    <div class="sub">League of Legends · 2–5 Spieler</div>
+    <div class="divider"></div>
+  </header>
+
+  <!-- ============ HOME ============ -->
+  <main id="home" class="view narrow hidden">
+    <section class="panel">
+      <h2>Dein Name</h2>
+      <input id="nameIn" type="text" maxlength="20" placeholder="z. B. Faker" autocomplete="nickname">
+    </section>
+
+    <section class="panel">
+      <h2>Neuer Raum</h2>
+      <button id="createBtn" class="btn primary block" type="button">Raum erstellen</button>
+      <p class="help">Du wirst Host und kannst den Link im Discord teilen.</p>
+    </section>
+
+    <div class="or"><span>oder</span></div>
+
+    <section class="panel">
+      <h2>Raum beitreten</h2>
+      <div class="row">
+        <input id="codeIn" class="grow code-input" type="text" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Raumcode">
+        <button id="joinBtn" class="btn" type="button">Beitreten</button>
+      </div>
+    </section>
+
+    <button id="rejoinBtn" class="btn ghost block hidden" type="button"></button>
+  </main>
+
+  <!-- ============ LOBBY ============ -->
+  <main id="lobby" class="view narrow hidden">
+    <section class="panel center">
+      <div class="label">Raumcode</div>
+      <div class="bigcode" id="lCode"></div>
+      <div class="row center-row">
+        <button class="btn" type="button" data-copy-link>🔗 Link kopieren</button>
+        <button class="btn ghost" type="button" data-leave>Verlassen</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Spieler <span class="count" id="lCount"></span></h2>
+      <ul id="lPlayers" class="plist"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Champion-Pool</h2>
+      <div id="lChips" class="chips"></div>
+      <div id="lPool" class="help"></div>
+    </section>
+
+    <button id="startBtn" class="btn primary block hidden" type="button">Spiel starten</button>
+    <p id="lWait" class="status hidden">Warte, bis der Host das Spiel startet …</p>
+  </main>
+
+  <!-- ============ GAME ============ -->
+  <main id="game" class="view hidden">
+    <div class="gbar">
+      <div class="ginfo">
+        <span class="room" id="gCode"></span>
+        <span class="meta">Runde <b id="gRound"></b> · <span id="gPool"></span></span>
+      </div>
+      <div class="gactions">
+        <button class="btn small" type="button" data-copy-link>🔗 Link</button>
+        <button id="toLobbyBtn" class="btn small hidden" type="button">↩ Lobby</button>
+        <button class="btn small ghost" type="button" data-leave>Verlassen</button>
+      </div>
+    </div>
+
+    <div id="turnBar" class="turnbar"></div>
+
+    <div id="grid" class="grid"></div>
+
+    <section id="rank" class="panel rank hidden"></section>
+
+    <section class="panel log">
+      <h2>Verlauf</h2>
+      <ul id="log"></ul>
+    </section>
+  </main>
+
+  <p class="foot">Champion-Daten &amp; Bilder: Riot Games Data Dragon. Inoffizielles Fan-Projekt, nicht von Riot Games unterstützt.</p>
+</div>
+
+<!-- ============ GUESS MODAL ============ -->
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="modal-box panel">
+    <h2 id="mTitle">Wer bist du?</h2>
+    <div class="ac">
+      <input id="guessIn" type="text" autocomplete="off" spellcheck="false" placeholder="Champion eingeben …" aria-autocomplete="list" aria-controls="sugg">
+      <ul id="sugg" class="sugg" role="listbox"></ul>
+    </div>
+    <p class="help">Ein falscher Tipp kostet dich <b>+1 Frage</b>.</p>
+    <div class="row">
+      <button id="mCancel" class="btn ghost grow" type="button">Abbrechen</button>
+      <button id="mSubmit" class="btn primary grow" type="button">Tipp abgeben</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

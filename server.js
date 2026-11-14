@@ -1,0 +1,413 @@
+'use strict';
+
+const express = require('express');
+const http = require('http');
+const path = require('path');
+const crypto = require('crypto');
+const { Server } = require('socket.io');
+
+const PORT = process.env.PORT || 3000;
+const DD = 'https://ddragon.leagueoflegends.com';
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 5;
+const TAGS = ['Fighter', 'Tank', 'Mage', 'Assassin', 'Marksman', 'Support'];
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+/* ================= Champion-Daten ================= */
+let version = null;
+let champions = []; // {id, name, title, tags}
+
+async function loadChampions() {
+  const vs = await (await fetch(`${DD}/api/versions.json`)).json();
+  const v = vs.find(x => /^\d+\.\d+\.\d+$/.test(x));
+  const cj = await (await fetch(`${DD}/cdn/${v}/data/de_DE/champion.json`)).json();
+  const list = Object.values(cj.data)
+    .map(c => ({ id: c.id, name: c.name, title: c.title || '', tags: c.tags || [] }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  if (!list.length) throw new Error('Leere Championliste');
+  champions = list;
+  version = v;
+  console.log(`[ddragon] Patch ${v} geladen, ${list.length} Champions`);
+}
+
+async function loadWithRetry() {
+  try {
+    await loadChampions();
+  } catch (e) {
+    console.error('[ddragon] Laden fehlgeschlagen:', e.message, '– neuer Versuch in 15 s');
+    setTimeout(loadWithRetry, 15000);
+  }
+}
+loadWithRetry();
+// alle 6 Stunden auf neuen Patch prüfen (laufende Runden behalten ihre Champions)
+setInterval(() => loadChampions().catch(e => console.error('[ddragon] Refresh:', e.message)), 6 * 3600 * 1000);
+
+const poolFor = tags => (tags.length ? champions.filter(c => c.tags.some(t => tags.includes(t))) : champions);
+const normalize = s => String(s || '').toLowerCase().normalize('NFD')
+  .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+
+/* ================= Räume ================= */
+const rooms = new Map();
+
+function newCode() {
+  let code;
+  do {
+    code = Array.from({ length: 4 }, () => CODE_CHARS[crypto.randomInt(CODE_CHARS.length)]).join('');
+  } while (rooms.has(code));
+  return code;
+}
+
+function createRoom() {
+  const room = {
+    code: newCode(),
+    hostPid: null,
+    players: [],
+    state: 'lobby', // lobby | playing | finished
+    tags: [],
+    round: 0,
+    turnPid: null,
+    doneCounter: 0,
+    version: null,
+    log: [],
+    lastActive: Date.now(),
+    hostTimer: null,
+  };
+  rooms.set(room.code, room);
+  return room;
+}
+
+function addLog(room, text) {
+  room.log.push({ t: Date.now(), text });
+  if (room.log.length > 40) room.log.shift();
+}
+
+const isConnected = p => p.sockets.size > 0;
+const byPid = (room, pid) => room.players.find(p => p.pid === pid);
+
+function viewFor(room, sid) {
+  const reveal = room.state === 'finished';
+  const me = room.players.find(p => p.sid === sid);
+  return {
+    code: room.code,
+    state: room.state,
+    round: room.round,
+    tags: room.tags,
+    poolSize: poolFor(room.tags).length,
+    version: room.version || version,
+    youPid: me ? me.pid : null,
+    hostPid: room.hostPid,
+    turnPid: room.turnPid,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    players: room.players.map(p => ({
+      pid: p.pid,
+      name: p.name,
+      connected: isConnected(p),
+      q: p.q,
+      penalties: p.penalties,
+      done: p.done,
+      doneOrder: p.doneOrder,
+      // Den eigenen Champion bekommt man erst, wenn man ihn erraten hat.
+      champ: p.champ && (p.sid !== sid || p.done || reveal) ? p.champ : null,
+    })),
+    log: room.log.slice(-15),
+  };
+}
+
+function broadcast(room) {
+  room.lastActive = Date.now();
+  for (const p of room.players) {
+    if (!p.sockets.size) continue;
+    const view = viewFor(room, p.sid);
+    for (const sockId of p.sockets) io.to(sockId).emit('state', view);
+  }
+}
+
+function nextUndone(room, startIdx) {
+  const n = room.players.length;
+  for (let k = 0; k < n; k++) {
+    const p = room.players[(((startIdx + k) % n) + n) % n];
+    if (!p.done) return p.pid;
+  }
+  return null;
+}
+
+function advanceTurn(room) {
+  const idx = room.players.findIndex(p => p.pid === room.turnPid);
+  room.turnPid = nextUndone(room, idx + 1);
+}
+
+function checkFinished(room) {
+  if (room.state === 'playing' && room.players.length && room.players.every(p => p.done)) {
+    room.state = 'finished';
+    room.turnPid = null;
+    addLog(room, `🏁 Runde ${room.round} beendet!`);
+  }
+}
+
+function startRound(room) {
+  if (!champions.length) return 'Championdaten sind noch nicht geladen – bitte kurz warten.';
+  if (room.players.length < MIN_PLAYERS) return `Mindestens ${MIN_PLAYERS} Spieler nötig.`;
+  const pool = poolFor(room.tags).slice();
+  if (pool.length < room.players.length) return 'Zu wenige Champions für diese Klassenauswahl.';
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  room.round += 1;
+  room.version = version;
+  room.state = 'playing';
+  room.doneCounter = 0;
+  room.players.forEach((p, i) => {
+    p.champ = pool[i];
+    p.q = 0;
+    p.penalties = 0;
+    p.done = false;
+    p.doneOrder = 0;
+  });
+  room.turnPid = nextUndone(room, (room.round - 1) % room.players.length);
+  addLog(room, `🎲 Runde ${room.round} gestartet – ${byPid(room, room.turnPid).name} beginnt.`);
+  return null;
+}
+
+function pickNewHost(room) {
+  const next = room.players.find(isConnected) || room.players[0];
+  if (next && next.pid !== room.hostPid) {
+    room.hostPid = next.pid;
+    addLog(room, `👑 ${next.name} ist jetzt Host.`);
+  }
+}
+
+function removePlayer(room, pid) {
+  const idx = room.players.findIndex(p => p.pid === pid);
+  if (idx < 0) return;
+  const [p] = room.players.splice(idx, 1);
+  for (const sockId of p.sockets) {
+    const s = io.sockets.sockets.get(sockId);
+    if (s) s.data.code = null;
+  }
+  if (!room.players.length) {
+    rooms.delete(room.code);
+    return;
+  }
+  if (room.hostPid === pid) pickNewHost(room);
+  if (room.state === 'playing') {
+    if (room.turnPid === pid) room.turnPid = nextUndone(room, idx);
+    checkFinished(room);
+  }
+  broadcast(room);
+}
+
+// Räume ohne verbundene Spieler nach 3 Stunden aufräumen
+setInterval(() => {
+  const cutoff = Date.now() - 3 * 3600 * 1000;
+  for (const [code, room] of rooms) {
+    if (!room.players.some(isConnected) && room.lastActive < cutoff) rooms.delete(code);
+  }
+}, 10 * 60 * 1000);
+
+/* ================= Socket.io ================= */
+const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim().slice(0, 20);
+const validSid = s => typeof s === 'string' && s.length >= 10 && s.length <= 100;
+const safeAck = ack => (typeof ack === 'function' ? ack : () => {});
+
+io.on('connection', socket => {
+  const ctx = () => {
+    const room = rooms.get(socket.data.code);
+    const me = room && room.players.find(p => p.sid === socket.data.sid);
+    return { room, me };
+  };
+
+  function detach() {
+    const { room, me } = ctx();
+    socket.data.code = null;
+    if (!me) return;
+    me.sockets.delete(socket.id);
+    if (!isConnected(me)) {
+      if (room.hostPid === me.pid) {
+        clearTimeout(room.hostTimer);
+        room.hostTimer = setTimeout(() => {
+          const host = byPid(room, room.hostPid);
+          if (rooms.has(room.code) && host && !isConnected(host) && room.players.some(isConnected)) {
+            pickNewHost(room);
+            broadcast(room);
+          }
+        }, 45000);
+      }
+      broadcast(room);
+    }
+  }
+
+  function attach(room, player) {
+    detach();
+    socket.data.code = room.code;
+    socket.data.sid = player.sid;
+    player.sockets.add(socket.id);
+  }
+
+  const meta = () => ({ version, champList: champions.map(c => ({ id: c.id, name: c.name })) });
+
+  socket.on('create', (data, ack) => {
+    ack = safeAck(ack);
+    const name = cleanName(data && data.name);
+    const sid = data && data.sessionId;
+    if (!name) return ack({ ok: false, error: 'Bitte gib einen Namen ein.' });
+    if (!validSid(sid)) return ack({ ok: false, error: 'Ungültige Sitzung – Seite neu laden.' });
+    const room = createRoom();
+    const player = { pid: crypto.randomUUID(), sid, name, sockets: new Set(), q: 0, penalties: 0, done: false, doneOrder: 0, champ: null };
+    room.players.push(player);
+    room.hostPid = player.pid;
+    addLog(room, `🏠 ${name} hat den Raum erstellt.`);
+    attach(room, player);
+    ack({ ok: true, code: room.code, ...meta() });
+    broadcast(room);
+  });
+
+  socket.on('join', (data, ack) => {
+    ack = safeAck(ack);
+    const code = String((data && data.code) || '').toUpperCase().trim();
+    const sid = data && data.sessionId;
+    if (!validSid(sid)) return ack({ ok: false, error: 'Ungültige Sitzung – Seite neu laden.' });
+    const room = rooms.get(code);
+    if (!room) return ack({ ok: false, notFound: true, error: `Raum „${code}“ gibt es nicht (mehr).` });
+
+    let player = room.players.find(p => p.sid === sid);
+    if (!player) {
+      const name = cleanName(data && data.name);
+      if (!name) return ack({ ok: false, needName: true, error: 'Bitte gib einen Namen ein.' });
+      if (room.state !== 'lobby') return ack({ ok: false, error: 'Das Spiel läuft schon. Der Host kann zurück in die Lobby gehen, damit du beitreten kannst.' });
+      if (room.players.length >= MAX_PLAYERS) return ack({ ok: false, error: `Der Raum ist voll (max. ${MAX_PLAYERS} Spieler).` });
+      if (room.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return ack({ ok: false, error: 'Dieser Name ist im Raum schon vergeben.' });
+      player = { pid: crypto.randomUUID(), sid, name, sockets: new Set(), q: 0, penalties: 0, done: false, doneOrder: 0, champ: null };
+      room.players.push(player);
+      addLog(room, `👋 ${name} ist beigetreten.`);
+    }
+    attach(room, player);
+    if (room.hostPid === player.pid) clearTimeout(room.hostTimer);
+    ack({ ok: true, code: room.code, ...meta() });
+    broadcast(room);
+  });
+
+  socket.on('leave', (_, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (room && me) {
+      addLog(room, `🚪 ${me.name} hat den Raum verlassen.`);
+      removePlayer(room, me.pid);
+    }
+    socket.data.code = null;
+    ack({ ok: true });
+  });
+
+  socket.on('kick', (data, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (!room || !me || room.hostPid !== me.pid) return ack({ ok: false, error: 'Nur der Host kann Spieler entfernen.' });
+    const target = byPid(room, data && data.pid);
+    if (!target || target.pid === me.pid) return ack({ ok: false });
+    for (const sockId of target.sockets) io.to(sockId).emit('kicked');
+    addLog(room, `❌ ${target.name} wurde entfernt.`);
+    removePlayer(room, target.pid);
+    ack({ ok: true });
+  });
+
+  socket.on('settings', (data, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (!room || !me || room.hostPid !== me.pid || room.state !== 'lobby') return ack({ ok: false });
+    const tags = Array.isArray(data && data.tags) ? TAGS.filter(t => data.tags.includes(t)) : [];
+    room.tags = tags;
+    broadcast(room);
+    ack({ ok: true });
+  });
+
+  socket.on('start', (_, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (!room || !me || room.hostPid !== me.pid) return ack({ ok: false, error: 'Nur der Host kann starten.' });
+    if (room.state === 'playing') return ack({ ok: false, error: 'Die Runde läuft bereits.' });
+    const err = startRound(room);
+    if (err) return ack({ ok: false, error: err });
+    broadcast(room);
+    ack({ ok: true });
+  });
+
+  socket.on('toLobby', (_, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (!room || !me || room.hostPid !== me.pid) return ack({ ok: false });
+    room.state = 'lobby';
+    room.turnPid = null;
+    room.players.forEach(p => { p.champ = null; p.done = false; p.q = 0; p.penalties = 0; p.doneOrder = 0; });
+    addLog(room, '↩ Zurück in der Lobby.');
+    broadcast(room);
+    ack({ ok: true });
+  });
+
+  socket.on('question', (data, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (!room || !me || room.state !== 'playing') return ack({ ok: false });
+    const target = byPid(room, data && data.pid);
+    if (!target || target.done) return ack({ ok: false });
+    const delta = data.delta === -1 ? -1 : 1;
+    target.q = Math.max(0, target.q + delta);
+    broadcast(room);
+    ack({ ok: true });
+  });
+
+  socket.on('nextTurn', (_, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (!room || !me || room.state !== 'playing') return ack({ ok: false });
+    if (room.hostPid !== me.pid && room.turnPid !== me.pid) return ack({ ok: false, error: 'Du bist nicht dran.' });
+    advanceTurn(room);
+    const next = byPid(room, room.turnPid);
+    if (next) addLog(room, `➡ ${next.name} ist dran.`);
+    broadcast(room);
+    ack({ ok: true });
+  });
+
+  socket.on('guess', (data, ack) => {
+    ack = safeAck(ack);
+    const { room, me } = ctx();
+    if (!room || !me || room.state !== 'playing' || me.done || !me.champ) return ack({ ok: false, error: 'Gerade nicht möglich.' });
+    const g = normalize(data && data.guess);
+    if (!g) return ack({ ok: false, error: 'Bitte einen Champion eingeben.' });
+    const known = champions.some(c => normalize(c.name) === g || normalize(c.id) === g);
+    if (!known) return ack({ ok: false, error: 'Diesen Champion kenne ich nicht – bitte aus der Liste wählen.' });
+
+    const correct = normalize(me.champ.name) === g || normalize(me.champ.id) === g;
+    if (correct) {
+      me.done = true;
+      me.doneOrder = ++room.doneCounter;
+      addLog(room, `✅ ${me.name} hat ${me.champ.name} erraten – mit ${me.q} ${me.q === 1 ? 'Frage' : 'Fragen'}!`);
+      if (room.turnPid === me.pid) {
+        advanceTurn(room);
+        const next = byPid(room, room.turnPid);
+        if (next) addLog(room, `➡ ${next.name} ist dran.`);
+      }
+      checkFinished(room);
+    } else {
+      me.q += 1;
+      me.penalties += 1;
+      addLog(room, `❌ ${me.name} tippt falsch: „${String(data.guess).slice(0, 30)}“ (+1 Frage)`);
+    }
+    broadcast(room);
+    ack({ ok: true, correct, champ: correct ? me.champ : null });
+  });
+
+  socket.on('disconnect', detach);
+});
+
+/* ================= HTTP ================= */
+const PUBLIC = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC));
+app.get('/room/:code', (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
+app.get('/healthz', (req, res) => res.json({ ok: true, version, champions: champions.length, rooms: rooms.size }));
+
+server.listen(PORT, () => console.log(`Wer bin ich? läuft auf http://localhost:${PORT}`));
