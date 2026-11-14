@@ -155,7 +155,7 @@ function show(id) {
   ['home', 'lobby', 'game'].forEach(v => $('#' + v).classList.toggle('hidden', v !== id));
   $('#logo').classList.toggle('compact', id === 'game');
   $('#reactBar').classList.toggle('hidden', id !== 'game');
-  if (id !== 'game') { $('#notes').classList.add('hidden'); $('#reveal').classList.add('hidden'); }
+  if (id !== 'game') $('#reveal').classList.add('hidden');
 }
 
 function goHome(prefillCode) {
@@ -496,9 +496,10 @@ function renderGame() {
 
     let action = '';
     if (isMe && playing && !p.done) {
-      action = `<button class="btn primary" type="button" data-act="guess">Ich hab's erraten!</button>
-        <button class="btn small" type="button" data-act="notes">📋 Notizblock</button>
-        <button class="btn small ghost" type="button" data-act="giveup">🏳 Aufgeben</button>`;
+      action = isTurn
+        ? `<button class="btn primary" type="button" data-act="guess">Ich hab's erraten!</button>`
+        : `<button class="btn primary" type="button" disabled title="Raten geht nur, wenn du am Zug bist">Raten, wenn du dran bist</button>`;
+      action += `        <button class="btn small ghost" type="button" data-act="giveup">🏳 Aufgeben</button>`;
     } else if (p.gaveUp) action = `<div class="fin-note gave">Aufgegeben nach ${p.q} ${qWord(p.q)}</div>`;
     else if (p.done) action = `<div class="fin-note">✓ Erraten mit ${p.q} ${qWord(p.q)}</div>`;
 
@@ -592,9 +593,7 @@ $('#game').addEventListener('click', e => {
   switch (act) {
     case 'q': socket.emit('question', { pid: b.dataset.pid, delta: +b.dataset.d }, fail); break;
     case 'next': socket.emit('nextTurn', null, fail); break;
-    case 'guess': openGuess(); break;
-    case 'notes': openNotes(); break;
-    case 'giveup':
+    case 'guess': openGuess(); break;    case 'giveup':
       if (confirm('Wirklich aufgeben? Dein Champion wird aufgedeckt und du landest am Ende der Rangliste.')) {
         socket.emit('giveUp', null, res => { if (res && res.ok) toast(`Du warst ${res.champ.name}.`); });
       }
@@ -698,56 +697,6 @@ socket.on('reaction', ({ name, emoji }) => {
     { transform: `translate(${(Math.random() - 0.5) * 80}px,-55vh) scale(1)`, opacity: 0 },
   ], { duration: 2600, easing: 'ease-out' }).onfinish = () => d.remove();
 });
-
-/* ---------- Notizblock (privat) ---------- */
-let excluded = new Set();
-const notesKey = () => `wbi.notes.${view.code}.${view.round}`;
-function loadNotes() {
-  try { excluded = new Set(JSON.parse(store.get(notesKey()) || '[]')); } catch { excluded = new Set(); }
-}
-function saveNotes() { store.set(notesKey(), JSON.stringify([...excluded])); }
-function notesPool() {
-  return view.tags.length ? champList.filter(c => (c.tags || []).some(t => view.tags.includes(t))) : champList;
-}
-function openNotes() {
-  loadNotes();
-  $('#nSearch').value = '';
-  $('#nTags').innerHTML = TAGS.map(([k, de]) => `<button type="button" class="chip" data-xtag="${k}">✕ ${de}</button>`).join('');
-  renderNotes();
-  $('#notes').classList.remove('hidden');
-}
-function renderNotes() {
-  const v = view.version || ddVersion;
-  const q = norm($('#nSearch').value);
-  const onlyLeft = $('#nOnlyLeft').checked;
-  const list = notesPool();
-  const left = list.filter(c => !excluded.has(c.id)).length;
-  $('#nCount').textContent = `${left} von ${list.length} übrig`;
-  $('#nGrid').innerHTML = list
-    .filter(c => (!q || norm(c.name).includes(q)) && (!onlyLeft || !excluded.has(c.id)))
-    .map(c => `<button type="button" class="nchamp ${excluded.has(c.id) ? 'x' : ''}" data-id="${c.id}" title="${esc(c.name)}">
-      <img src="${iconUrl(v, c.id)}" alt="" loading="lazy"><span>${esc(c.name)}</span></button>`).join('');
-}
-$('#nGrid').addEventListener('click', e => {
-  const b = e.target.closest('.nchamp'); if (!b) return;
-  const id = b.dataset.id;
-  if (excluded.has(id)) excluded.delete(id); else excluded.add(id);
-  saveNotes();
-  if ($('#nOnlyLeft').checked) renderNotes();
-  else { b.classList.toggle('x'); const list = notesPool(); $('#nCount').textContent = `${list.filter(c => !excluded.has(c.id)).length} von ${list.length} übrig`; }
-});
-$('#nTags').addEventListener('click', e => {
-  const b = e.target.closest('[data-xtag]'); if (!b) return;
-  const t = b.dataset.xtag;
-  notesPool().forEach(c => { if ((c.tags || []).includes(t)) excluded.add(c.id); });
-  saveNotes(); renderNotes();
-  toast(`Alle ${TAG_DE[t]} ausgeschlossen.`);
-});
-$('#nSearch').addEventListener('input', renderNotes);
-$('#nOnlyLeft').addEventListener('change', renderNotes);
-$('#nReset').onclick = () => { if (confirm('Alle Markierungen zurücksetzen?')) { excluded.clear(); saveNotes(); renderNotes(); } };
-$('#nClose').onclick = () => $('#notes').classList.add('hidden');
-$('#notes').addEventListener('click', e => { if (e.target.id === 'notes') $('#notes').classList.add('hidden'); });
 
 /* ---------- Guess-Modal mit Autocomplete ---------- */
 let suggIdx = -1;

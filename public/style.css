@@ -285,24 +285,6 @@ table.score td:not(:first-child),table.score th:not(:first-child){text-align:cen
 .float-emoji small{display:block; color:var(--gold-l); font-weight:700; font-size:.75rem; text-shadow:0 1px 4px #000}
 #game{padding-bottom:70px}
 
-/* ---------- Notizblock ---------- */
-.notes-box{max-width:760px; max-height:calc(100vh - 32px); display:flex; flex-direction:column; gap:10px}
-#notes{padding-top:16px; align-items:center}
-.notes-head{display:flex; justify-content:space-between; align-items:center}
-.notes-head h2{margin:0}
-.notes-tags .chip{min-height:36px; padding:6px 10px; font-size:.82rem}
-.notes-bar{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
-.chk{display:flex; gap:6px; align-items:center; color:var(--gold-l); font-size:.9rem; cursor:pointer}
-.chk input{width:18px; height:18px; accent-color:var(--hex)}
-.ncount{color:var(--hex); font-weight:700; margin-left:auto}
-.ngrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:6px; overflow:auto; min-height:120px; padding:2px}
-.nchamp{display:grid; justify-items:center; gap:3px; padding:4px 2px; border:1px solid var(--gold-dd); background:#010a13; color:var(--gold-l); cursor:pointer; font:500 .68rem 'Barlow',sans-serif; position:relative; touch-action:manipulation}
-.nchamp img{width:48px; height:48px; display:block}
-.nchamp span{max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 2px}
-.nchamp:hover{border-color:var(--gold)}
-.nchamp.x{opacity:.3; filter:grayscale(1)}
-.nchamp.x::after{content:"✕"; position:absolute; top:2px; left:0; right:0; text-align:center; font-size:2.2rem; line-height:48px; color:var(--bad); font-weight:700}
-
 /* ---------- Ranking & Log ---------- */
 .rank h2{justify-content:space-between; flex-wrap:wrap}
 .rank .done-l{color:var(--ok); font-family:'Barlow',sans-serif; font-size:.82rem; text-transform:uppercase; letter-spacing:.1em}

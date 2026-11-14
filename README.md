@@ -42,11 +42,10 @@ Node.js ab Version 18 ist nötig, weil der Server das eingebaute `fetch` benutzt
    - Bei **Ja** darf man weiterfragen, sonst ist der Nächste dran. In der Lobby kann der Host auf „immer nur 1 Frage pro Zug“ umstellen.
    - Wer offline ist, wird beim Abstimmen nicht mitgezählt. Fragesteller und Host können mit **Jetzt auswerten** früher auswerten oder die Frage **zurückziehen**.
    - Unter jeder Karte steht der **Fragen-Verlauf** mit allen Antworten.
-6. **Ich hab's erraten!** öffnet ein Eingabefeld mit Autovervollständigung. Ein richtiger Tipp deckt deine Karte auf, ein falscher kostet +1 Frage und beendet deinen Zug. Mit **Aufgeben** deckst du deinen Champion auf und landest am Ende der Rangliste.
+6. **Ich hab's erraten!** geht nur, wenn du am Zug bist, und öffnet ein Eingabefeld mit Autovervollständigung. Ein richtiger Tipp deckt deine Karte auf, ein falscher kostet +1 Frage und beendet deinen Zug. Mit **Aufgeben** deckst du deinen Champion auf und landest am Ende der Rangliste.
 7. Wenn alle fertig sind, erscheint die Rangliste (wenigste Fragen gewinnt) und dazu die **Gesamtwertung** über alle Runden mit Siegen und Ø Fragen. Danach startet der Host eine **neue Runde** oder geht zurück in die **Lobby**.
 
 Extras:
-- 📋 **Notizblock**: ein privates Raster mit allen Champions zum Ausschließen, auch eine ganze Klasse auf einmal
 - 😀 **Emoji-Reaktionen**, die bei allen über den Bildschirm fliegen
 - 🎉 **Aufdecken in groß** mit Splash-Art, Titel und Kurzgeschichte des Champions
 - 🏅 **Auszeichnungen** am Rundenende: Blitzmerker, Neugierigste Person, Glückspilz, Nein-Mauer, Kamikaze, Ahnungslos

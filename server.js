@@ -574,6 +574,7 @@ io.on('connection', socket => {
     ack = safeAck(ack);
     const { room, me } = ctx();
     if (!room || !me || room.state !== 'playing' || me.done || !me.champ) return ack({ ok: false, error: 'Gerade nicht möglich.' });
+    if (room.turnPid !== me.pid) return ack({ ok: false, error: 'Du kannst nur raten, wenn du am Zug bist.' });
     const g = normalize(data && data.guess);
     if (!g) return ack({ ok: false, error: 'Bitte einen Champion eingeben.' });
     const known = champions.some(c => normalize(c.name) === g || normalize(c.id) === g);
