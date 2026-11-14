@@ -396,6 +396,12 @@ io.on('connection', socket => {
       me.q += 1;
       me.penalties += 1;
       addLog(room, `❌ ${me.name} tippt falsch: „${String(data.guess).slice(0, 30)}“ (+1 Frage)`);
+      // Falscher Tipp beendet den eigenen Zug
+      if (room.turnPid === me.pid) {
+        advanceTurn(room);
+        const next = byPid(room, room.turnPid);
+        if (next && next.pid !== me.pid) addLog(room, `➡ ${next.name} ist dran.`);
+      }
     }
     broadcast(room);
     ack({ ok: true, correct, champ: correct ? me.champ : null });

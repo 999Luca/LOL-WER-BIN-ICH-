@@ -393,10 +393,8 @@ function submitGuess() {
       closeGuess();
       toast(`🎉 Richtig! Du bist ${res.champ.name}!`, 'good');
     } else {
-      const box = $('.modal-box');
-      box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
-      toast(`❌ Leider falsch – du bist nicht ${guess}. +1 Frage`, 'err');
-      $('#guessIn').select();
+      closeGuess();
+      toast(`❌ Leider falsch – du bist nicht ${guess}. +1 Frage, der Nächste ist dran.`, 'err');
     }
   });
 }
