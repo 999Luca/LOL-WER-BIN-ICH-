@@ -114,16 +114,55 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px #c8aa6e22, inset 0 0 
 .ginfo .meta b{color:var(--gold-l)}
 .gactions{display:flex; flex-wrap:wrap; gap:8px}
 
-.turnbar{
-  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
-  border:1px solid var(--gold-d); padding:10px 14px; margin-bottom:16px;
-  background:linear-gradient(90deg,#0a1e2e,#010a13);
+/* ---------- Frage-Panel ---------- */
+.qpanel{
+  border:1px solid var(--gold-d); padding:14px 16px; margin-bottom:16px; display:grid; gap:10px;
+  background:linear-gradient(90deg,#0a1e2e,#010a13); transition:border-color .2s, box-shadow .2s;
 }
-.turnbar .t{font-size:1.05rem}
-.turnbar .t b{color:var(--gold); font-family:'Cinzel',serif}
-.turnbar.mine{border-color:var(--hex); box-shadow:0 0 20px #0ac8b944, inset 0 0 20px #0ac8b922}
-.turnbar.mine .t b{color:var(--hex-l)}
-.turnbar.fin{border-color:#2a9d66}
+.qpanel:empty{display:none}
+.qpanel.mine{border-color:var(--hex); box-shadow:0 0 22px #0ac8b944, inset 0 0 20px #0ac8b922}
+.qpanel.need-vote{border-color:var(--gold); box-shadow:0 0 22px #c8aa6e55; animation:glow 1.6s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 34px #c8aa6e88}}
+.qpanel.fin{border-color:#2a9d66}
+.q-head{font-size:1.05rem}
+.q-head b{color:var(--gold); font-family:'Cinzel',serif}
+.q-head.mine b{color:var(--hex-l)}
+.q-text{font-family:'Cinzel',serif; font-weight:800; font-size:clamp(1.25rem,4vw,1.8rem); color:var(--gold-l); line-height:1.25; text-shadow:0 0 18px #c8aa6e44}
+.q-sub{margin:0; color:var(--muted); font-size:.9rem}
+.mini{display:inline-flex; align-items:center; gap:6px; color:var(--gold-l); font-weight:700; vertical-align:middle}
+.mini img{width:26px; height:26px; border:1px solid var(--gold)}
+.ask-row{display:grid; grid-template-columns:1fr auto auto; gap:8px}
+.ask-row .idea{padding:0 12px; font-size:1.2rem}
+.q-actions{display:flex; flex-wrap:wrap; gap:8px}
+.vote-btns{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.vbtn{
+  font:700 1.05rem 'Barlow',sans-serif; min-height:56px; cursor:pointer; border:2px solid var(--gold-d); color:var(--gold-l);
+  background:linear-gradient(180deg,#1e2328,#0a0e13); transition:.15s; touch-action:manipulation; border-radius:0;
+}
+.vbtn.yes:hover,.vbtn.yes.sel{border-color:var(--ok); background:linear-gradient(180deg,#145238,#07170f); color:#d6ffe9}
+.vbtn.no:hover,.vbtn.no.sel{border-color:var(--bad); background:linear-gradient(180deg,#5a1622,#1a0509); color:#ffd6dd}
+.vbtn.maybe:hover,.vbtn.maybe.sel{border-color:var(--gold); background:linear-gradient(180deg,#3d3218,#110d05)}
+.vbtn.sel{box-shadow:0 0 16px currentColor; transform:translateY(-1px)}
+.vchips{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.vchip{font-size:.8rem; padding:2px 8px; border:1px solid var(--gold-dd); color:var(--muted)}
+.vchip.ok{border-color:var(--hex-d); color:var(--hex-l)}
+.vchip.yes{border-color:#2a7f57; color:#c9f7df}
+.vchip.no{border-color:#7a2433; color:#ffc9d2}
+.vchip.maybe{border-color:var(--gold-d); color:var(--gold)}
+.vcount{font-size:.8rem; color:var(--muted); margin-left:auto}
+.result{border-left:4px solid var(--gold); padding:8px 12px; background:#010a1399; display:grid; gap:4px; animation:pop .35s ease-out}
+.result.yes{border-color:var(--ok)} .result.no{border-color:var(--bad)}
+.result .r-q{color:var(--muted); font-size:.9rem}
+.result .r-q b{color:var(--gold-l)}
+.result .r-a{font-family:'Cinzel',serif; font-weight:800; font-size:1.3rem}
+.result.yes .r-a{color:var(--ok)} .result.no .r-a{color:#ff6f86} .result.maybe .r-a{color:var(--gold)}
+.result .r-votes{display:flex; flex-wrap:wrap; gap:6px}
+@keyframes pop{from{transform:scale(.97); opacity:0}}
+@media (max-width:480px){
+  .ask-row{grid-template-columns:1fr auto}
+  .ask-row .btn.primary{grid-column:1 / -1}
+  .vbtn{font-size:.95rem; min-height:52px}
+}
 
 /* ---------- Cards ---------- */
 .grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px}
@@ -188,6 +227,25 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px #c8aa6e22, inset 0 0 
 .pen{font-size:.78rem; color:#ff9aab}
 .body .btns{display:grid; gap:8px; margin-top:auto}
 .fin-note{font-size:.88rem; color:#c9f7df; text-align:center}
+.fin-note.gave{color:var(--muted)}
+.ribbon.gave{background:linear-gradient(90deg,#3c3c41,#a09b8c); color:#111}
+.card.gaveup{border-color:#5b5a56}
+.wins{font-size:.8rem; color:var(--gold); margin-left:auto; flex:none}
+details.hist{border:1px solid var(--gold-dd); background:#010a1399}
+details.hist summary{cursor:pointer; padding:7px 10px; font-size:.82rem; color:var(--gold); font-weight:600; list-style:none; user-select:none}
+details.hist summary::-webkit-details-marker{display:none}
+details.hist summary::after{content:"▾"; float:right; transition:transform .15s}
+details.hist[open] summary::after{transform:rotate(180deg)}
+details.hist ul{list-style:none; margin:0; padding:0 10px 8px; display:grid; gap:4px; font-size:.84rem; max-height:180px; overflow:auto}
+details.hist li{display:grid; grid-template-columns:20px 1fr; gap:4px; color:var(--gold-l)}
+details.hist li.no{color:var(--muted)}
+.sub-h{font-family:'Cinzel',serif; color:var(--gold); font-size:.95rem; margin:18px 0 8px}
+table.score{width:100%; border-collapse:collapse; font-size:.92rem}
+table.score th{color:var(--muted); font-weight:600; text-align:left; padding:6px 8px; border-bottom:1px solid var(--gold-d); font-size:.8rem; text-transform:uppercase; letter-spacing:.05em}
+table.score td{padding:7px 8px; border-bottom:1px solid #46371455}
+table.score tr.you td{color:var(--hex-l)}
+table.score td:not(:first-child),table.score th:not(:first-child){text-align:center}
+.confetti{position:fixed; top:0; z-index:80; pointer-events:none; border-radius:1px}
 
 /* ---------- Ranking & Log ---------- */
 .rank h2{justify-content:space-between; flex-wrap:wrap}
@@ -237,6 +295,6 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px #c8aa6e22, inset 0 0 
   .counter{grid-template-columns:34px 1fr 46px}
 }
 @media (prefers-reduced-motion:reduce){
-  .mystery .ring,.counter.bump .val b,.modal-box.shake{animation:none}
+  .mystery .ring,.counter.bump .val b,.modal-box.shake,.qpanel.need-vote,.result{animation:none}
   .flip{transition:none}
 }

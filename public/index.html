@@ -69,6 +69,12 @@
       <div id="lPool" class="help"></div>
     </section>
 
+    <section class="panel">
+      <h2>Regeln</h2>
+      <div id="lRules" class="chips"></div>
+      <p class="help">Wer dran ist, stellt eine Ja/Nein-Frage – alle anderen stimmen ab. Jede Frage zählt +1.</p>
+    </section>
+
     <button id="startBtn" class="btn primary block hidden" type="button">Spiel starten</button>
     <p id="lWait" class="status hidden">Warte, bis der Host das Spiel startet …</p>
   </main>
@@ -81,13 +87,14 @@
         <span class="meta">Runde <b id="gRound"></b> · <span id="gPool"></span></span>
       </div>
       <div class="gactions">
+        <button id="muteBtn" class="btn small" type="button" aria-label="Ton an/aus">🔊</button>
         <button class="btn small" type="button" data-copy-link>🔗 Link</button>
         <button id="toLobbyBtn" class="btn small hidden" type="button">↩ Lobby</button>
         <button class="btn small ghost" type="button" data-leave>Verlassen</button>
       </div>
     </div>
 
-    <div id="turnBar" class="turnbar"></div>
+    <section id="qPanel" class="qpanel" aria-live="polite"></section>
 
     <div id="grid" class="grid"></div>
 

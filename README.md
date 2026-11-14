@@ -37,9 +37,15 @@ Node.js ab Version 18 ist nötig, weil der Server das eingebaute `fetch` benutzt
 2. Die anderen öffnen den Link, geben ihren Namen ein und treten bei.
 3. In der Lobby wählt der Host den Champion-Pool (alle Champions oder bestimmte Klassen) und startet das Spiel.
 4. Jeder sieht die Karten der anderen. Die eigene Karte zeigt nur **„?“**. Der Server schickt dir deinen eigenen Champion erst, wenn du ihn erraten hast. Nachschauen in den DevTools bringt also nichts.
-5. Reihum Fragen stellen und mit **+1** zählen. Wer dran ist, beendet seinen Zug mit **Zug beenden**. Der Host kann mit **Nächster** weiterschalten.
-6. **Ich hab's erraten!** öffnet ein Eingabefeld mit Autovervollständigung. Ein richtiger Tipp deckt deine Karte auf, ein falscher kostet +1 Frage.
-7. Wenn alle fertig sind, erscheint die Rangliste (wenigste Fragen gewinnt). Danach startet der Host eine **neue Runde** oder geht zurück in die **Lobby**, um die Einstellungen zu ändern oder neue Spieler aufzunehmen.
+5. Wer dran ist, tippt eine Ja/Nein-Frage ein (🎲 liefert eine zufällige Idee). Alle anderen stimmen mit **Ja**, **Nein** oder **Weiß nicht** ab. Jede Frage zählt automatisch +1.
+   - Die Mehrheit entscheidet. Bei Gleichstand zwischen Ja und Nein lautet das Ergebnis „unklar“.
+   - Bei **Ja** darf man weiterfragen, sonst ist der Nächste dran. In der Lobby kann der Host auf „immer nur 1 Frage pro Zug“ umstellen.
+   - Wer offline ist, wird beim Abstimmen nicht mitgezählt. Fragesteller und Host können mit **Jetzt auswerten** früher auswerten oder die Frage **zurückziehen**.
+   - Unter jeder Karte steht der **Fragen-Verlauf** mit allen Antworten.
+6. **Ich hab's erraten!** öffnet ein Eingabefeld mit Autovervollständigung. Ein richtiger Tipp deckt deine Karte auf, ein falscher kostet +1 Frage und beendet deinen Zug. Mit **Aufgeben** deckst du deinen Champion auf und landest am Ende der Rangliste.
+7. Wenn alle fertig sind, erscheint die Rangliste (wenigste Fragen gewinnt) und dazu die **Gesamtwertung** über alle Runden mit Siegen und Ø Fragen. Danach startet der Host eine **neue Runde** oder geht zurück in die **Lobby**.
+
+Extras: Sounds (Ton aus mit 🔊), Vibration auf dem Handy, Konfetti bei richtigen Tipps und „🎯 Du bist dran!“ im Tab-Titel.
 
 Lädt jemand die Seite neu, landet er wieder in seinem Raum. Die Sitzungs-ID liegt im `localStorage`. Wer länger offline ist, kann vom Host entfernt werden. Ist der Host länger als 45 Sekunden offline, übernimmt ein anderer Spieler.
 
