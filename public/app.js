@@ -263,7 +263,7 @@ function renderGame() {
     if (isMe && playing && !p.done) action = `<button class="btn primary" type="button" data-act="guess">Ich hab's erraten!</button>`;
     else if (p.done) action = `<div class="fin-note">✓ Erraten mit ${p.q} ${qWord(p.q)}</div>`;
     return `
-      <article class="card ${isMe ? 'me' : ''} ${isTurn ? 'turn' : ''} ${p.done ? 'done' : ''} ${p.connected ? '' : 'offline'}">
+      <article class="card ${isMe ? 'me' : ''} ${isTurn ? 'turn' : ''} ${p.done ? 'done' : ''} ${p.connected ? '' : 'is-offline'}">
         ${ribbon}
         ${p.connected ? '' : '<div class="ribbon off">offline</div>'}
         <div class="art">${art}</div>

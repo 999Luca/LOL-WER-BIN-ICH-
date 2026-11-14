@@ -135,7 +135,7 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px #c8aa6e22, inset 0 0 
 .card.me{border-color:var(--hex-d)}
 .card.turn{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 0 26px #c8aa6e55, 0 10px 30px #000a}
 .card.done{border-color:#2a9d66; box-shadow:0 0 18px #3fd38a33, 0 10px 30px #000a}
-.card.offline .art{filter:grayscale(.8) brightness(.6)}
+.card.is-offline .art{filter:grayscale(.8) brightness(.6)}
 .art{position:relative; aspect-ratio:1/1; perspective:1200px; overflow:hidden; background:#010a13}
 @media (min-width:720px){.art{aspect-ratio:4/5}}
 .flip{position:absolute; inset:0; transform-style:preserve-3d; transition:transform .9s cubic-bezier(.2,.7,.2,1)}
@@ -221,7 +221,7 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px #c8aa6e22, inset 0 0 
 .sugg li.act,.sugg li:hover{background:#c8aa6e26; color:#fff}
 
 /* ---------- Misc ---------- */
-.offline{position:fixed; top:0; left:0; right:0; z-index:60; background:var(--bad); color:#fff; text-align:center; padding:6px; font-weight:600; font-size:.9rem}
+#offline{position:fixed; top:0; left:0; right:0; z-index:60; background:var(--bad); color:#fff; text-align:center; padding:6px; font-weight:600; font-size:.9rem}
 .toast{position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px); opacity:0; pointer-events:none; background:#0a1428; border:1px solid var(--gold); color:var(--gold-l); padding:10px 18px; z-index:70; transition:.25s; max-width:calc(100% - 32px); text-align:center; box-shadow:0 10px 30px #000a}
 .toast.show{opacity:1; transform:translateX(-50%)}
 .toast.err{border-color:var(--bad)}
